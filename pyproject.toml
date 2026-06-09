@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "trainprobe"
+version = "0.1.0"
+description = "Training dynamics observability for PyTorch models"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=1.13",
+    "numpy>=1.21",
+]
+
+[project.optional-dependencies]
+wandb = ["wandb>=0.15"]
+dev = ["pytest>=7.0", "wandb>=0.15"]
+
+[project.urls]
+Homepage = "https://github.com/MarcelMatsal/trainprobe"
+Repository = "https://github.com/MarcelMatsal/trainprobe"
+
+[tool.hatch.build.targets.wheel]
+packages = ["trainprobe"]
