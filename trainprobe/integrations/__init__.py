@@ -52,20 +52,30 @@ class TrainProbeCallback:
             layers=layers,
         )
         self._scope = None
+        self._last_loss = None   # HF only flushes loss in on_log, not on_step_end
 
     def on_train_begin(self, args, state, control, model=None, **kwargs):
         import trainprobe as tp
 
         self._scope = tp.attach(model, **self._init_kwargs)
 
-    def on_step_end(self, args, state, control, model=None, logs=None, **kwargs):
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        # HF Trainer passes the loss dict here, not in on_step_end.
+        if logs:
+            loss = logs.get("loss")
+            if loss is not None:
+                self._last_loss = float(loss)
+
+    def on_step_end(self, args, state, control, **kwargs):
         if self._scope is None:
             return
-        loss = (logs or {}).get("loss")
-        self._scope.step(state.global_step, loss=loss)
+        # _last_loss may be None for many steps between HF log flushes —
+        # the scope handles this gracefully (OnLossSpike falls back to every-N).
+        self._scope.step(state.global_step, loss=self._last_loss)
 
     def on_train_end(self, args, state, control, **kwargs):
         self._scope = None
+        self._last_loss = None
 
 
 class LightningTrainProbeCallback:
@@ -106,11 +116,11 @@ class LightningTrainProbeCallback:
 
         self._scope = tp.attach(pl_module, **self._init_kwargs)
 
-    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx=0):
+    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx, **kwargs):
         if self._scope is not None:
             self._scope.capture_batch(batch)
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, **kwargs):
         if self._scope is None:
             return
         step = trainer.global_step
